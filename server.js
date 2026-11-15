@@ -11,6 +11,63 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve the built React website.
+const path = require("path");
+
+app.use(express.static(
+  path.join(__dirname, "frontend", "dist")
+));
+
+// Public website routes: only list slots and create bookings.
+app.use("/web-api", async (req, res) => {
+  const allowed =
+    (req.method === "GET" && req.path === "/slots") ||
+    (req.method === "POST" && req.path === "/bookings");
+
+  if (!allowed) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  try {
+    const headers = {
+      "X-API-Key": process.env.API_KEY,
+    };
+
+    const options = {
+      method: req.method,
+      headers,
+      signal: AbortSignal.timeout(30000),
+    };
+
+    if (req.method === "POST") {
+      headers["Content-Type"] = "application/json";
+
+      const key = req.get("Idempotency-Key");
+      if (key) headers["Idempotency-Key"] = key;
+
+      options.body = JSON.stringify(req.body);
+    }
+
+    const response = await fetch(
+      `http://127.0.0.1:${PORT}${req.path}`,
+      options
+    );
+
+    const data = await response.json();
+
+    const retryAfter = response.headers.get("Retry-After");
+    if (retryAfter) res.set("Retry-After", retryAfter);
+
+    return res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Website API error:", error);
+
+    return res.status(502).json({
+      error: "Unable to reach booking service. Please try again.",
+    });
+  }
+});
+
 
 // Level 2: API key authentication
 app.use((req, res, next) => {

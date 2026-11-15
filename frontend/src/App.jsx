@@ -2,8 +2,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API = "http://localhost:3000";
-const API_KEY = import.meta.env.VITE_API_KEY;
+const API = "/web-api";
 
 export default function App() {
   const [slots, setSlots] = useState([]);
@@ -16,11 +15,11 @@ export default function App() {
 
   async function loadSlots() {
     try {
-      const res = await fetch(`${API}/slots`, {
-        headers: { "X-API-Key": API_KEY },
-      });
+      const res = await fetch(`${API}/slots`);
       const data = await res.json();
+  
       if (!res.ok) throw new Error(data.error);
+  
       setSlots(data.slots || []);
     } catch (err) {
       setMessage(err.message || "Unable to load slots");
@@ -35,13 +34,13 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-
+    setBooking(null);
+  
     try {
       const res = await fetch(`${API}/bookings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-API-Key": API_KEY,
           "Idempotency-Key": crypto.randomUUID(),
         },
         body: JSON.stringify({
@@ -50,10 +49,11 @@ export default function App() {
           email,
         }),
       });
-
+  
       const data = await res.json();
+  
       if (!res.ok) throw new Error(data.error);
-
+  
       setBooking(data);
       await loadSlots();
     } catch (err) {
